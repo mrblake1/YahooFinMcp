@@ -1,0 +1,35 @@
+{
+  "name": "yahoo-finance-mcp",
+  "version": "1.0.0",
+  "description": "MCP server that provides structured Yahoo Finance market data tools",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "smoke": "npm run build && node dist/smoke-test.js",
+    "smoke:live": "npm run build && node dist/smoke-test.js --live"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "yahoo-finance",
+    "finance"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "latest",
+    "axios": "^1.7.9",
+    "yahoo-finance2": "2.8.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
