@@ -1,7 +1,8 @@
 import axios from "axios";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { createServer } from "node:http";
+import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { CallToolRequestSchema, ListToolsRequestSchema, type Tool } from "@modelcontextprotocol/sdk/types.js";
+import { Server as McpServer } from "@modelcontextprotocol/sdk/server/index.js";
 import { handler as financialsHandler, definition as financialsDefinition } from "./tools/financials.js";
 import { handler as historicalHandler, definition as historicalDefinition } from "./tools/historical.js";
 import { handler as newsHandler, definition as newsDefinition } from "./tools/news.js";
@@ -35,7 +36,7 @@ const toolsByName = new Map<string, RegisteredTool>(tools.map((tool) => [tool.de
 
 axios.defaults.timeout = 15000;
 
-const server = new Server(
+const mcpServer = new McpServer(
   {
     name: manifest.name,
     version: manifest.version
@@ -47,13 +48,13 @@ const server = new Server(
   }
 );
 
-server.setRequestHandler(ListToolsRequestSchema, async () => {
+mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: tools.map((tool) => tool.definition)
   };
 });
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   const toolName = request.params.name;
   const tool = toolsByName.get(toolName);
 
@@ -68,9 +69,58 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
+const transport = new NodeStreamableHTTPServerTransport({
+  sessionIdGenerator: undefined
+});
+
 const start = async (): Promise<void> => {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  await mcpServer.connect(transport);
+
+  const port = Number(process.env.PORT ?? "3000");
+  const host = process.env.HOST ?? "0.0.0.0";
+
+  const httpServer = createServer(async (req, res) => {
+    const requestUrl = new URL(req.url ?? "/", `http://${req.headers.host ?? `${host}:${port}`}`);
+
+    if (requestUrl.pathname === "/health") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ status: "ok" }));
+      return;
+    }
+
+    if (requestUrl.pathname !== "/mcp") {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "Not Found" }));
+      return;
+    }
+
+    await transport.handleRequest(req, res);
+  });
+
+  const shutdown = async (): Promise<void> => {
+    await transport.close();
+    await new Promise<void>((resolve) => {
+      httpServer.close(() => resolve());
+    });
+  };
+
+  process.on("SIGINT", () => {
+    void shutdown().finally(() => process.exit(0));
+  });
+  process.on("SIGTERM", () => {
+    void shutdown().finally(() => process.exit(0));
+  });
+
+  httpServer.listen(port, host, () => {
+    console.log(
+      JSON.stringify({
+        status: "started",
+        name: manifest.name,
+        endpoint: `http://${host}:${port}/mcp`,
+        health: `http://${host}:${port}/health`
+      })
+    );
+  });
 };
 
 start().catch((error) => {

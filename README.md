@@ -4,7 +4,7 @@ A TypeScript Model Context Protocol (MCP) server that wraps Yahoo Finance data f
 
 ## Features
 
-- Stdio transport for Claude Desktop and Copilot compatibility
+- Streamable HTTP transport for remote MCP clients and Azure hosting
 - Runtime input validation with zod
 - Structured market data tools for quotes, history, search, financials, options, and news
 - Centralized error responses with MCP-compatible error payloads
@@ -23,15 +23,31 @@ A TypeScript Model Context Protocol (MCP) server that wraps Yahoo Finance data f
 
    npm start
 
-## Claude Desktop Configuration
+## Running Locally
 
-Add this server to your Claude Desktop MCP config:
+Start the HTTP server:
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+By default the server listens on `0.0.0.0:3000` and exposes:
+
+- MCP endpoint: `http://localhost:3000/mcp`
+- Health check: `http://localhost:3000/health`
+
+Set `HOST=127.0.0.1` if you want to bind only to loopback during local development.
+
+## MCP Client Configuration
+
+Use the HTTP endpoint in your MCP client config:
 
 {
   "mcpServers": {
     "yahoo-finance-mcp": {
-      "command": "node",
-      "args": ["/absolute/path/to/yahoo-finance-mcp/dist/index.js"]
+      "url": "http://localhost:3000/mcp"
     }
   }
 }
